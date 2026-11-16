@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Сургалтын албаны хүсэлтийн тойм
 
-## Getting Started
+Next.js dashboard for student requests, with live data from the Kaneo **Requests (REQ)** project.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+nvm use                       # Node 22 (see .nvmrc)
+npm install
+cp .env.example .env.local    # then set KANEO_API_TOKEN
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Production: `npm run build && npm start`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Code map
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+  lib/
+    env.ts               settings from .env.local, validated with zod
+    kaneo/
+      schema.d.ts        Kaneo API types — GENERATED, run `npm run kaneo:types`
+      client.ts          typed Kaneo API calls (openapi-fetch)
+      requests.ts        Kaneo task → StudentRequest; cached with "use cache"
+    dashboard.ts         all dashboard numbers (date-fns, Ulaanbaatar time)
+  components/            one file per widget; charts use Recharts
+  app/page.tsx           reads ?period=7d|1m|6m and renders the widgets
+```
 
-## Learn More
+Data flows one way: **Kaneo API → `client.ts` → `requests.ts` → `dashboard.ts` → components.**
+Everything in `lib/` runs on the server only (`server-only`), so the token never reaches the browser.
 
-To learn more about Next.js, take a look at the following resources:
+## Packages
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Package | Used for |
+|---|---|
+| `openapi-fetch` + `openapi-typescript` | Kaneo API calls typed from Kaneo's own OpenAPI spec |
+| `zod` | validating env vars and Kaneo's untyped `eventData` |
+| `date-fns` + `@date-fns/tz` | date math in Ulaanbaatar time |
+| `p-limit` | at most 8 parallel Kaneo requests |
+| `recharts` | weekly bar chart and today's pie |
+| `clsx` | conditional class names |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If Kaneo's API changes, run `npm run kaneo:types`; TypeScript will then point at any code that needs updating.
 
-## Deploy on Vercel
+## Where each number comes from
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Widget | Kaneo source |
+|---|---|
+| Ирсэн / Шийдвэрлэсэн / Татгалзсан | task `status` (`done`, `rejected`, others = open) |
+| Хамгийн их ирсэн хүсэлтүүд | the `**Хүсэлтийн төрөл:**` line in the description |
+| Татгалзсан шалтгаанууд | red labels on the task |
+| Хугацаа хэтэрсэн | `dueDate` passed while open, or closed after it |
+| Дундаж хугацаа | created → last `status_changed` to done/rejected |
+| Weekly chart / Өдрийн гүйцэтгэл | close date of `done` tasks; arrivals by `createdAt` |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Excluded: archived tasks, tasks with no "Хүсэлтийн төрөл" line (internal work), and test
+submissions matching `KANEO_TEST_MARKERS`.
+
+**Azaa AI:** Kaneo has no field for it. Put the Kaneo user id(s) the AI closes requests with in
+`KANEO_AI_USER_IDS`; until then every resolution counts as "Ажилтан".
+
+Kaneo data is cached for `KANEO_REVALIDATE_SECONDS` (default 5 min).
