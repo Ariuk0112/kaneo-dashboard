@@ -5,8 +5,9 @@ import { z } from "zod";
 const schema = z.object({
   KANEO_API_URL: z.url().default("https://api.kaneo.ufe.edu.mn/api"),
   KANEO_API_TOKEN: z.string().min(1, "KANEO_API_TOKEN is required"),
-  KANEO_PROJECT_ID: z.string().default("oon14b0oskd5nmec1ki0wvj5"), // "Requests" (REQ)
-  KANEO_REVALIDATE_SECONDS: z.coerce.number().int().positive().default(300),
+  KANEO_WORKSPACE_ID: z.string().min(1, "KANEO_WORKSPACE_ID is required"),
+  KANEO_EXCLUDE_PROJECTS: z.string().default("staging,test"),
+  KANEO_REVALIDATE_SECONDS: z.coerce.number().int().positive().default(60),
   KANEO_AI_USER_IDS: z.string().default(""),
   KANEO_TEST_MARKERS: z.string().default("b24fm1195,pentest,tes test"),
 });
@@ -22,4 +23,6 @@ export const env = {
   aiUserIds: new Set(list(parsed.KANEO_AI_USER_IDS)),
   /** Substrings (title/description) that mark test submissions. */
   testMarkers: list(parsed.KANEO_TEST_MARKERS),
+  /** Projects whose name contains one of these are skipped (staging, test boards…). */
+  excludeProjects: list(parsed.KANEO_EXCLUDE_PROJECTS),
 };

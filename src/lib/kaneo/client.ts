@@ -14,6 +14,13 @@ const kaneo = createClient<paths>({
   fetch: (request) => fetch(request, { cache: "no-store" }),
 });
 
+/** The workspace's (non-archived) projects. */
+export async function getProjects(workspaceId: string) {
+  const { data, error } = await kaneo.GET("/project", { params: { query: { workspaceId } } });
+  if (error || !data) throw new Error(`Kaneo: failed to load projects: ${error}`);
+  return data;
+}
+
 /** Every task in a project, across all board columns and pages. */
 export async function getAllTasks(projectId: string): Promise<KaneoTask[]> {
   const tasks: KaneoTask[] = [];

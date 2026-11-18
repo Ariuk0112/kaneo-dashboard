@@ -34,7 +34,7 @@ export type Ranked = { label: string; value: number };
 export type Dashboard = Awaited<ReturnType<typeof getDashboard>>;
 
 export async function getDashboard(period: PeriodKey) {
-  const all = await getStudentRequests();
+  const { requests: all, fetchedAt, sources } = await getStudentRequests();
   await connection(); // the rest depends on the current time, so run it per request
   const now = new Date();
 
@@ -49,6 +49,8 @@ export async function getDashboard(period: PeriodKey) {
 
   return {
     period,
+    /** When the data was last loaded from Kaneo, and from which projects. */
+    source: { fetchedAt: format(fetchedAt, "HH:mm", ub), projects: sources },
     range: { from: format(from, "yyyy/MM/dd", ub), to: format(now, "yyyy/MM/dd", ub) },
     today: { label: format(now, "MM/dd", ub), ...(days.get(dayKey(now)) ?? emptyDay()) },
     kpi: {
@@ -125,7 +127,7 @@ function monthCalendar(days: Map<string, DayStat>, now: Date) {
 /** Average time from arrival to resolved/rejected, e.g. "26ц 36мин". */
 function averageDuration(requests: StudentRequest[]): string | null {
   const minutes = requests
-    .filter((r) => r.closedAt)
+    .filter((r) => r.closedAt && r.durationKnown)
     .map((r) => differenceInMinutes(r.closedAt!, r.createdAt));
   if (minutes.length === 0) return null;
   const avg = Math.round(minutes.reduce((a, b) => a + b, 0) / minutes.length);

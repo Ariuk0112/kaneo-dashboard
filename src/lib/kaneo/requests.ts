@@ -2,9 +2,9 @@ import "server-only";
 import { cacheLife, cacheTag } from "next/cache";
 import { z } from "zod";
 import { env } from "@/lib/env";
-import { getActivities, getAllTasks, type KaneoActivity, type KaneoTask } from "./client";
+import { getActivities, getAllTasks, getProjects, type KaneoActivity, type KaneoTask } from "./client";
 
-/** A student request, simplified from a Kaneo task in the "Requests" project. */
+/** A student request, simplified from a Kaneo task. */
 export type StudentRequest = {
   number: number | null;
   type: string;
@@ -12,6 +12,8 @@ export type StudentRequest = {
   rejectReasons: string[];
   createdAt: Date;
   closedAt: Date | null;
+  /** False when the task arrived in Kaneo already closed, so its processing time is unknown. */
+  durationKnown: boolean;
   dueAt: Date | null;
   closedBy: "staff" | "ai" | null;
 };
@@ -22,9 +24,12 @@ const REJECT_LABEL_COLOR = "red";
 // `eventData` is untyped in the API spec; this is its shape for status changes.
 const statusChange = z.object({ newStatus: z.string() });
 
-/** The "**Хүсэлтийн төрөл:** …" line the request form writes into the description. */
+/**
+ * The request type line the request form writes into the description:
+ * "**Хүсэлтийн төрөл:** …" (old form) or "**Хүсэлт:** …" (СЭЗИС app).
+ */
 function requestType(task: KaneoTask): string | null {
-  const match = /\*\*Хүсэлтийн төрөл:\*\*\s*(.+)/.exec(task.description ?? "");
+  const match = /\*\*(?:Хүсэлтийн төрөл|Хүсэлт):\*\*\s*(.+)/.exec(task.description ?? "");
   return match ? match[1].trim() : null;
 }
 
@@ -45,7 +50,10 @@ function lastClose(activity: KaneoActivity[]) {
 
 function toStudentRequest(task: KaneoTask, activity: KaneoActivity[]): StudentRequest {
   const outcome = task.status === "done" ? "resolved" : task.status === "rejected" ? "rejected" : "open";
-  const close = outcome === "open" ? undefined : lastClose(activity);
+  const statusClose = outcome === "open" ? undefined : lastClose(activity);
+  // Some integrations (e.g. the СЭЗИС app) create tasks directly in a final column, with no
+  // status change logged. Then the "created" entry is the best close time we have.
+  const close = statusClose ?? (outcome === "open" ? undefined : activity.find((a) => a.type === "created"));
 
   return {
     number: task.number,
@@ -53,27 +61,46 @@ function toStudentRequest(task: KaneoTask, activity: KaneoActivity[]): StudentRe
     outcome,
     rejectReasons: task.labels.filter((l) => l.color === REJECT_LABEL_COLOR).map((l) => l.name),
     createdAt: new Date(task.createdAt),
-    closedAt: close ? new Date(close.createdAt) : null,
+    closedAt: close ? new Date(close.createdAt) : outcome === "open" ? null : new Date(task.createdAt),
+    durationKnown: statusClose !== undefined,
     dueAt: task.dueDate ? new Date(task.dueDate) : null,
     closedBy: close ? (close.userId && env.aiUserIds.has(close.userId.toLowerCase()) ? "ai" : "staff") : null,
   };
 }
 
+/** Tag on the cached Kaneo data; `updateTag(KANEO_CACHE_TAG)` forces a fresh load. */
+export const KANEO_CACHE_TAG = "kaneo";
+
 /**
- * All real student requests from Kaneo.
+ * All real student requests from every (non-excluded) project in the Kaneo workspace,
+ * plus when they were fetched and how many came from each project.
  * Cached on the server for KANEO_REVALIDATE_SECONDS, so Kaneo is called at most that often.
  */
-export async function getStudentRequests(): Promise<StudentRequest[]> {
+export async function getStudentRequests() {
   "use cache";
-  cacheLife({ stale: 60, revalidate: env.KANEO_REVALIDATE_SECONDS, expire: 24 * 3600 });
-  cacheTag("kaneo");
+  cacheLife({ stale: 30, revalidate: env.KANEO_REVALIDATE_SECONDS, expire: 24 * 3600 });
+  cacheTag(KANEO_CACHE_TAG);
 
-  const tasks = (await getAllTasks(env.KANEO_PROJECT_ID)).filter(
-    (t) =>
-      t.status !== "archived" &&
-      requestType(t) !== null && // tasks without a request type are internal work, not student requests
-      !isTestSubmission(t),
+  const projects = (await getProjects(env.KANEO_WORKSPACE_ID)).filter(
+    (p) => !env.excludeProjects.some((word) => p.name.toLowerCase().includes(word)),
   );
+  const perProject = await Promise.all(
+    projects.map(async (p) => ({
+      name: p.name,
+      tasks: (await getAllTasks(p.id)).filter(
+        (t) =>
+          t.status !== "archived" &&
+          requestType(t) !== null && // tasks without a request type are internal work, not student requests
+          !isTestSubmission(t),
+      ),
+    })),
+  );
+  const tasks = perProject.flatMap((p) => p.tasks);
   const activities = await getActivities(tasks.map((t) => t.id));
-  return tasks.map((task, i) => toStudentRequest(task, activities[i]));
+
+  return {
+    requests: tasks.map((task, i) => toStudentRequest(task, activities[i])),
+    fetchedAt: new Date(),
+    sources: perProject.map((p) => ({ name: p.name, count: p.tasks.length })),
+  };
 }

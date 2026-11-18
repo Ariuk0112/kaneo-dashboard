@@ -1,6 +1,7 @@
 import Link from "next/link";
 import clsx from "clsx";
 import { PERIODS, type Dashboard, type PeriodKey } from "@/lib/dashboard";
+import { RefreshButton } from "./RefreshButton";
 import { TodayPie } from "./TodayPie";
 
 export function Header({ data }: { data: Dashboard }) {
@@ -30,6 +31,13 @@ export function Header({ data }: { data: Dashboard }) {
             </Link>
           ))}
         </nav>
+        <div className="mt-2.5 flex items-center gap-3 text-xs font-medium text-sky-100/80">
+          <RefreshButton />
+          <span>
+            Kaneo-оос {data.source.fetchedAt}-д шинэчилсэн ·{" "}
+            {data.source.projects.map((p) => `${p.name}: ${p.count}`).join(", ") || "төсөл олдсонгүй"}
+          </span>
+        </div>
       </div>
 
       <div className="relative -mb-[30px] flex h-[140px] w-[540px] shrink-0 items-start justify-between gap-6 self-start rounded-3xl border border-white/20 bg-gradient-to-b from-[#3D86F8]/95 to-[#0B63F6]/95 px-7 py-5 shadow-xl shadow-blue-900/20 backdrop-blur-md">

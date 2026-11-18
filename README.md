@@ -1,6 +1,7 @@
 # Сургалтын албаны хүсэлтийн тойм
 
-Next.js dashboard for student requests, with live data from the Kaneo **Requests (REQ)** project.
+Next.js dashboard for student requests, with live data from every project in a Kaneo workspace
+(`KANEO_WORKSPACE_ID`; projects named like `KANEO_EXCLUDE_PROJECTS`, default `staging,test`, are skipped).
 
 ## Run
 
@@ -49,16 +50,17 @@ If Kaneo's API changes, run `npm run kaneo:types`; TypeScript will then point at
 | Widget | Kaneo source |
 |---|---|
 | Ирсэн / Шийдвэрлэсэн / Татгалзсан | task `status` (`done`, `rejected`, others = open) |
-| Хамгийн их ирсэн хүсэлтүүд | the `**Хүсэлтийн төрөл:**` line in the description |
+| Хамгийн их ирсэн хүсэлтүүд | the `**Хүсэлт:**` (or older `**Хүсэлтийн төрөл:**`) line in the description |
 | Татгалзсан шалтгаанууд | red labels on the task |
 | Хугацаа хэтэрсэн | `dueDate` passed while open, or closed after it |
 | Дундаж хугацаа | created → last `status_changed` to done/rejected |
 | Weekly chart / Өдрийн гүйцэтгэл | close date of `done` tasks; arrivals by `createdAt` |
 
-Excluded: archived tasks, tasks with no "Хүсэлтийн төрөл" line (internal work), and test
+Excluded: archived tasks, tasks with no request-type line (internal work), and test
 submissions matching `KANEO_TEST_MARKERS`.
 
 **Azaa AI:** Kaneo has no field for it. Put the Kaneo user id(s) the AI closes requests with in
 `KANEO_AI_USER_IDS`; until then every resolution counts as "Ажилтан".
 
-Kaneo data is cached for `KANEO_REVALIDATE_SECONDS` (default 5 min).
+Kaneo data is cached for `KANEO_REVALIDATE_SECONDS` (default 60 s). The header shows when it was
+last loaded and from which projects; the **Шинэчлэх** button reloads from Kaneo right away.
