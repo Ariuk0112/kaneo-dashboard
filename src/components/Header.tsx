@@ -44,9 +44,12 @@ export function Header({ data }: { data: Dashboard }) {
             {loaded.chatbotAt && ` · Чатбот: ${loaded.chatbotAt}`}
           </span>
         </div>
-        {loaded.chatbotFailed && (
+        {loaded.chatbotProblem && (
           <p role="status" className="mt-1.5 inline-block rounded-full bg-amber-400/20 px-3 py-0.5 text-xs font-semibold text-amber-100 ring-1 ring-amber-300/40">
-            Чатботын өгөгдөл авахад алдаа гарлаа — чатботын хүсэлтийг Kaneo-гийн картаар харуулж байна.
+            {loaded.chatbotProblem === "denied"
+              ? "Чатботын өгөгдөл тохируулаагүй/эрхгүй"
+              : "Чатботын өгөгдөл авахад алдаа гарлаа"}{" "}
+            — чатботын хүсэлтийг Kaneo-гийн картаар харуулж байна.
           </p>
         )}
       </div>

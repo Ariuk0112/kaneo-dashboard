@@ -67,14 +67,21 @@ The **Бүгд / Апп (REQ) / Чатбот** switch (`?source=`) picks whose r
 
 If the chatbot API is not configured, or the call fails or its answer does not match the schema,
 the chatbot's own Kaneo cards are used instead (Бүгд then equals the old all-projects view), and on
-failure the header says «Чатботын өгөгдөл авахад алдаа гарлаа». The page never fails because of it.
+failure the header says «Чатботын өгөгдөл авахад алдаа гарлаа» (or «Чатботын өгөгдөл
+тохируулаагүй/эрхгүй» when the backend answers 404 — no service token set there — or 401 — wrong
+token). The page never fails because of it.
+
+Chatbot API semantics to know: «Шийдвэрлэсэн» is requests that reached DONE only (APPROVED /
+APPLYING still count as open); a request can have several rejection reasons, so the reason counts
+may add up to more than «Татгалзсан»; the backend does not drop test submissions
+(`KANEO_TEST_MARKERS` applies to Kaneo cards only).
 
 | Widget | Kaneo source | Chatbot API source |
 |---|---|---|
 | Ирсэн / Шийдвэрлэсэн / Татгалзсан | task `status` (`done`, `rejected`, others = open) | `totals.arrived / resolved / rejected` (rejected = staff rejections + rule refusals) |
 | Хамгийн их ирсэн хүсэлтүүд | the `**Хүсэлт:**` (or older `**Хүсэлтийн төрөл:**`) line in the description | `by_type[].arrived`, shown as `№number title` so it adds up with Kaneo's |
-| Татгалзсан шалтгаанууд | red labels on the task | `rejection_reasons[]` (failed rule → «Төлбөрийн өртэй», …; a person → «Ажилтан татгалзсан») |
-| Хугацаа хэтэрсэн | `dueDate` passed while open, or closed after it | `totals.overdue_open + closed_late`; the card also lists `overdue.by_office` and each open late request (type, office, due date, days late, request id) |
+| Татгалзсан шалтгаанууд | red labels on the task | `rejection_reasons[]` counts, zero rows hidden (failed rule → «Төлбөрийн өртэй», …; a person → «Ажилтан татгалзсан») |
+| Хугацаа хэтэрсэн | `dueDate` passed while open, or closed after it | `totals.overdue_open + closed_late`; the card also lists `overdue.by_office` and each open late request, most days late first (type, office, due date, days late, request id) |
 | Дундаж хугацаа | created → last `status_changed` to done/rejected | `decision_time.avg_hours`, weighted by `decision_time.count` |
 | Weekly chart / Өдрийн гүйцэтгэл | close date of `done` tasks; arrivals by `createdAt` | `daily[]`, as a separate «Чатбот» bar (the API does not say per day who decided); the calendar reads the 6-month answer so the whole month is filled |
 | Azaa AI share | `KANEO_AI_USER_IDS` (below) | `decided_by.auto` vs `decided_by.person`, under the weekly chart |

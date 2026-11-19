@@ -18,6 +18,8 @@ test("a changed shape is refused, not shown half-read", () => {
   assert.equal(chatbotDashboardSchema.safeParse({ ...fixture, totals: { arrived: 1 } }).success, false);
   assert.equal(chatbotDashboardSchema.safeParse({ ...fixture, daily: [{ date: "19/11", arrived: 0, resolved: 0, rejected: 0 }] }).success, false);
   assert.equal(chatbotDashboardSchema.safeParse({ ...fixture, decided_by: { auto: -1, person: 0 } }).success, false);
+  const late = { ...fixture.overdue.open[0], due: "16/11/2026" };
+  assert.equal(chatbotDashboardSchema.safeParse({ ...fixture, overdue: { ...fixture.overdue, open: [late] } }).success, false);
 });
 
 // The same signing Kaneo does in apps/api/src/plugins/generic-webhook/client.ts.

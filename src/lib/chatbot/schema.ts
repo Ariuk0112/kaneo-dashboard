@@ -3,10 +3,12 @@ import { z } from "zod";
 // No "server-only" / "@/" imports here, so `npm test` can load this file with plain Node.
 
 const count = z.number().int().nonnegative();
+// Formatted with date-fns, which throws on an unparsable date.
+const datetime = z.iso.datetime({ offset: true, local: true });
 
 /** GET {CHATBOT_API_URL}/api/v1/requests/dashboard/service?period=… (see README). */
 export const chatbotDashboardSchema = z.object({
-  generated_at: z.string(),
+  generated_at: datetime,
   period: z.object({ key: z.string(), from: z.string(), to: z.string(), tz: z.string() }),
   totals: z.object({
     arrived: count,
@@ -28,7 +30,7 @@ export const chatbotDashboardSchema = z.object({
         number: z.string(),
         title: z.string(),
         office: z.string(),
-        due: z.string(),
+        due: datetime,
         days_late: z.number(),
       }),
     ),

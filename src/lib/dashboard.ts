@@ -73,7 +73,8 @@ export async function getDashboard(period: PeriodKey, source: SourceKey) {
       fetchedAt: format(fetchedAt, "HH:mm", ub),
       projects: sources,
       chatbotAt: bot ? format(new Date(bot.generated_at), "HH:mm", ub) : null,
-      chatbotFailed: status === "error",
+      /** Why the chatbot API was not used, when it should have been. */
+      chatbotProblem: status === "error" || status === "denied" ? status : null,
     },
     range: { from: format(from, "yyyy/MM/dd", ub), to: format(now, "yyyy/MM/dd", ub) },
     today: { label: format(now, "MM/dd", ub), ...(days.get(dayKey(now)) ?? emptyDay()) },
@@ -92,6 +93,7 @@ export async function getDashboard(period: PeriodKey, source: SourceKey) {
       ...requests.map((r) => ({ label: r.type, value: 1 })),
       ...(bot?.by_type ?? []).map((t) => ({ label: `№${t.number} ${t.title}`, value: t.arrived })),
     ]),
+    // Counts per reason; one request can have several, so they may add up to more than `rejected`.
     rejectReasons: rank([
       ...requests.flatMap((r) => r.rejectReasons.map((label) => ({ label, value: 1 }))),
       ...(bot?.rejection_reasons ?? []).map((r) => ({ label: r.label, value: r.count })),
@@ -104,13 +106,15 @@ export async function getDashboard(period: PeriodKey, source: SourceKey) {
       /** Chatbot requests by the office holding them. */
       offices: bot?.overdue.by_office.filter((o) => o.open_overdue + o.closed_late > 0) ?? [],
       /** Chatbot requests late right now: request id only, never student data. */
-      late: (bot?.overdue.open ?? []).map((o) => ({
-        id: o.request_id,
-        type: `№${o.number} ${o.title}`,
-        office: o.office,
-        due: format(new Date(o.due), "yyyy/MM/dd", ub),
-        daysLate: o.days_late,
-      })),
+      late: (bot?.overdue.open ?? [])
+        .toSorted((a, b) => b.days_late - a.days_late) // worst first; the API sorts by due date
+        .map((o) => ({
+          id: o.request_id,
+          type: `№${o.number} ${o.title}`,
+          office: o.office,
+          due: format(new Date(o.due), "yyyy/MM/dd", ub),
+          daysLate: o.days_late,
+        })),
     },
   };
 }
